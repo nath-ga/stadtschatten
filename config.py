@@ -46,6 +46,26 @@ UHRZEIT = "15:00"           # HH:MM, Ortszeit
 ZEITZONE = "Europe/Berlin"
 
 # ------------------------------------------------------------------
+# Zeit-Aggregation ("Sonnendosis") – nur für die Expositionskarte
+# ------------------------------------------------------------------
+# True  -> kanten_sonnenanteil mittelt über das Fenster unten (stündlich).
+#          UHRZEIT oben gilt dann NUR noch für schatten_check.html.
+# False -> Einzelmoment wie bisher (UHRZEIT).
+AGG_AKTIV       = True
+AGG_START_STUNDE = 11    # erste Stunde (einschließlich)
+AGG_END_STUNDE   = 18    # letzte Stunde – siehe Frage unten
+
+# ------------------------------------------------------------------
+# Vegetation / Baumschatten (nDOM1)
+# ------------------------------------------------------------------
+NDOM_KACHEL_UNTERORDNER = "denkendorf"   # Unterordner in data/ mit den nDOM-Kacheln
+VEG_MIN_HOEHE      = 3.0    # ab dieser Höhe schattenrelevant (m)
+GEB_PUFFER_M       = 1.0    # Gebäude-Footprints aufpuffern (Wandkranz wegputzen)
+VEG_MIN_FLAECHE_M2 = 4.0    # Mindestfläche je Vegetationspolygon (Krümel raus)
+
+VEG_AKTIV = True    # False -> nur Gebäudeschatten (zum Vergleich/außerhalb BW) / True mit Bäumen
+
+# ------------------------------------------------------------------
 # Routing
 # ------------------------------------------------------------------
 # Start/Ziel als (lat, lon). Für v1 hier eintragen.
@@ -78,3 +98,9 @@ def get_zeitpunkt():
     """DATUM + UHRZEIT + ZEITZONE als tz-bewussten Timestamp (für pybdshadow)."""
     import pandas as pd
     return pd.Timestamp(f"{DATUM} {UHRZEIT}", tz=ZEITZONE)
+
+def get_zeitpunkt_stunde(stunde):
+    """DATUM + volle Stunde + ZEITZONE als tz-bewussten Timestamp (für die Aggregation).
+    stunde : ganze Zahl, z.B. 11 -> 11:00 am DATUM. Minuten sind hier immer 00."""
+    import pandas as pd
+    return pd.Timestamp(f"{DATUM} {stunde:02d}:00", tz=ZEITZONE)

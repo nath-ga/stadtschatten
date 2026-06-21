@@ -12,10 +12,11 @@ import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-from config import PLACE, ZENTRUM, RADIUS_M, get_zeitpunkt
-from modules.loader import lade_geh_graph, lade_gebaeude_mit_hoehe
+from config import (PLACE, ZENTRUM, RADIUS_M, get_zeitpunkt,
+                    AGG_AKTIV, AGG_START_STUNDE, AGG_END_STUNDE, DATUM)
+from modules.loader import lade_geh_graph, lade_hindernisse
 from modules.schatten import berechne_schatten, karte_schatten
-from modules.kantenbewertung import bewerte_kanten, karte_kanten
+from modules.kantenbewertung import bewerte_kanten, bewerte_kanten_aggregiert, karte_kanten
 from modules.routing import vergleiche_routen, karte_route
 
 # Schalter für die A->B-Route (schnellster vs. schattigster Weg).
@@ -30,17 +31,21 @@ def main():
 
     print("1/3  Daten laden ...")
     G = lade_geh_graph()
-    gebaeude = lade_gebaeude_mit_hoehe()
+    hindernisse = lade_hindernisse()
 
-    print("2/3  Schatten berechnen ...")
-    schatten = berechne_schatten(gebaeude)
-
-    print("3/3  Kanten bewerten ...")
-    G, edges = bewerte_kanten(G, schatten)
-
-    print("\nKarten schreiben ...")
-    karte_schatten(gebaeude, schatten)
-    karte_kanten(edges, schatten)
+    if AGG_AKTIV:
+        stunden = range(AGG_START_STUNDE, AGG_END_STUNDE + 1)
+        print(f"2-3/3  Zeit-Aggregation {AGG_START_STUNDE}-{AGG_END_STUNDE} Uhr ...")
+        G, edges = bewerte_kanten_aggregiert(G, hindernisse, stunden)
+        zeit_label = f"{DATUM} {AGG_START_STUNDE}-{AGG_END_STUNDE} Uhr (Mittel)"
+        karte_kanten(edges, schatten=None, zeit_label=zeit_label)
+    else:
+        print("2/3  Schatten berechnen ...")
+        schatten = berechne_schatten(hindernisse)
+        print("3/3  Kanten bewerten ...")
+        G, edges = bewerte_kanten(G, schatten)
+        karte_schatten(hindernisse, schatten)
+        karte_kanten(edges, schatten)
 
     if ROUTE_BERECHNEN:
         print("\nOptional: Route (schnellster vs. schattigster Weg) ...")
@@ -48,10 +53,11 @@ def main():
         karte_route(G, routen)
 
     print("\nFertig. Ergebnisse im Ordner 'output/':")
-    print("  schatten_check.html        – Gebäude + Schatten (Validierung)")
-    print("  kanten_sonnenanteil.html   – Wegenetz nach Sonnenanteil (die Auswertung)")
-    if ROUTE_BERECHNEN:
-        print("  route.html                 – schnellster vs. schattigster Weg")
+    if AGG_AKTIV:
+        print(f"  kanten_sonnenanteil.html   – Wegenetz, Mittel {AGG_START_STUNDE}-{AGG_END_STUNDE} Uhr")
+    else:
+        print("  schatten_check.html        – Gebäude + Schatten (Validierung)")
+        print("  kanten_sonnenanteil.html   – Wegenetz nach Sonnenanteil (die Auswertung)")
 
 
 if __name__ == "__main__":

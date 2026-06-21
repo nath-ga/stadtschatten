@@ -26,7 +26,7 @@ import osmnx as ox
 import geopandas as gpd
 from shapely.geometry import Point
 
-from config import CRS_METRISCH, CRS_WGS84, DATA_DIR, PLACE, ZENTRUM, RADIUS_M, LGL_KACHEL_UNTERORDNER
+from config import CRS_METRISCH, CRS_WGS84, DATA_DIR, PLACE, ZENTRUM, RADIUS_M, LGL_KACHEL_UNTERORDNER, VEG_AKTIV
 
 # Ordner mit den LGL-LoD2-Kacheln des aktiven Ortes: data/<AKTIVER_ORT>/
 LGL_KACHEL_DIR = os.path.join(PROJEKT_WURZEL, DATA_DIR, LGL_KACHEL_UNTERORDNER)
@@ -214,6 +214,26 @@ def lade_gebaeude_mit_hoehe():
     print("Keine LGL-Daten für dieses Gebiet – nutze OSM mit Höhen-Fallback.")
     return _lade_gebaeude_osm()
 
+def lade_hindernisse():
+    """Schattenwerfende Objekte: Gebäude (LoD2) + optional Vegetation (nDOM).
+    Rückgabe: GeoDataFrame[geometry, height] in CRS_WGS84 – fertig für berechne_schatten."""
+    import pandas as pd
+    gebaeude = lade_gebaeude_mit_hoehe()
+    if not VEG_AKTIV:
+        return gebaeude
+
+    from modules.vegetation import lade_vegetation
+    gebiet = _analyse_gebiet_25832()
+    vegetation = lade_vegetation(gebaeude, gebiet)
+    if len(vegetation) == 0:
+        return gebaeude
+
+    hindernisse = gpd.GeoDataFrame(
+        pd.concat([gebaeude, vegetation], ignore_index=True), crs=CRS_WGS84
+    )
+    print(f"Hindernisse gesamt: {len(gebaeude)} Gebäude + {len(vegetation)} Vegetation "
+          f"= {len(hindernisse)}.")
+    return hindernisse
 
 def _lade_gebaeude_osm():
     """
