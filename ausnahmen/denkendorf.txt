@@ -1,0 +1,14 @@
+# Denkendorf - bekannte OSM-Probleme, geprueft gegen Ortswissen (2026-07)
+
+# Jugendzentrum faelschlich als amenity=school getaggt - existiert zurecht
+# NICHT in der Kategorie Schule.
+Kinder- und Jugendzentrum Focus
+
+# Unbenanntes Kindergarten-Fragment ~62m von Muehlhalden-Kindergarten,
+# geschaetzter Randabstand ~8m (genau an AUFENTHALT_CLUSTER_PUFFER_M).
+# Sehr wahrscheinlich das eigenstaendige Klingenacker-Kindergarten
+# (Kurze Str. 6, echte Einrichtung, bestaetigt) - faelschlich mit
+# Muehlhalden-Kindergarten (Muehlhaldenstr. 28) zusammengefasst.
+# ISOLIEREN, nicht loeschen: die Einrichtung existiert echt, soll als
+# eigener "(ohne Name)"-Ort in der Rangliste auftauchen.
+!522864,5393990,15

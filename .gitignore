@@ -1,6 +1,8 @@
 data/
 cache/
 output/
+dev/
 .venv/
 __pycache__/
 *.pyc
+ablauf.md

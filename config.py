@@ -4,6 +4,8 @@
 # Ort, Zeitpunkt des Schattenwurfs, Routing-Verhalten.
 # Modell-Feintuning (Höhenannahmen) liegt bewusst in den Modulen, nicht hier.
 
+import os 
+
 # ------------------------------------------------------------------
 # Ort (OpenStreetMap-kompatibel)
 # ------------------------------------------------------------------
@@ -13,6 +15,8 @@
 PLACE    = "Denkendorf, Denkendorf, Deutschland"
 
 LGL_KACHEL_UNTERORDNER = "denkendorf"   # Unterordner in data/ mit den LGL-Kacheln dieses Laufs
+ORT_SLUG   = "denkendorf"                       # Kurzname des aktiven Orts
+OUTPUT_DIR = os.path.join("output", ORT_SLUG)   # output/<ort>/ – Karten je Ort getrennt
 
 # ------------------------------------------------------------------
 # Testgebiet-Zuschnitt (optional)
@@ -54,6 +58,7 @@ ZEITZONE = "Europe/Berlin"
 AGG_AKTIV       = True
 AGG_START_STUNDE = 11    # erste Stunde (einschließlich)
 AGG_END_STUNDE   = 18    # letzte Stunde – siehe Frage unten
+AGG_RASTER_M = 2.0
 
 # ------------------------------------------------------------------
 # Vegetation / Baumschatten (nDOM1)
@@ -91,8 +96,57 @@ CRS_WGS84    = 4326    # pybdshadow erwartet lon/lat
 # Pfade
 # ------------------------------------------------------------------
 DATA_DIR   = "data"      # Cache: OSM-Downloads, Graphen (gitignored)
-OUTPUT_DIR = "output"    # Ergebnisse: Karten, GPX (gitignored)
 
+# ------------------------------------------------------------------
+# ALKIS-Flurstücke (tatsächliche Nutzung)
+# ------------------------------------------------------------------
+ALKIS_FLURSTUECK_PFAD = "data/denkendorf/flurstueck.shp"  
+MIN_FREIFLAECHE_M2 = 20.0   # Flurstück nur bewertbar, wenn nach Dach-Abzug so viel frei
+
+# ------------------------------------------------------------------
+# Detail-Lupe eines Flurstücks: (lat, lon) im Flurstück, sonst None
+# ------------------------------------------------------------------
+DETAIL_PUNKT_LATLON = None
+# DETAIL_PUNKT_LATLON = (48.694808, 9.314938) # Beispiel Denkendorf Weingartstr. 1/1
+
+# ------------------------------------------------------------------
+# Karten-Rendering (folium)
+# ------------------------------------------------------------------
+# Gemeinsamer Zoom-Deckel fuer alle drei Auswertungskarten (exposition,
+# nutzung, aufenthalt). Zweck: Nutzer nicht weiter reinzoomen lassen, als
+# tatsaechlich Bildinformation da ist - sonst wird es nur eine haesslich
+# hochskalierte Kachel (Esri World Imagery) bzw. sichtbar klotzige
+# Rasterzellen (die 2m-Sonnendosis, ab ~19 blockig).
+# Handempirisch pruefen: im Browser auf die Satellit-Ebene stellen, in
+# Denkendorf so weit reinzoomen bis Kacheln nicht mehr schaerfer werden
+# (DevTools -> Network: gleiche Kachel wird nur noch hochskaliert) -
+# das ist die Zahl hier. Wert gilt je Ort; bei anderer Stadt (dichter
+# LGL/Esri-Abdeckung) ggf. hochsetzen.
+MAX_ZOOM_KARTE = 19
+
+# ------------------------------------------------------------------
+# Aufenthaltsorte (OSM)
+# ------------------------------------------------------------------
+AUFENTHALT_PUNKT_PUFFER_M = 5.0   # Punkt (z.B. Haltestelle) -> Wartebereich-Radius
+BUSHALT_DEDUP_M = 10.0            # Haltestellen näher als dies = eine (bus_stop+platform)
+
+# ------------------------------------------------------------------
+# Gewichtung Aufenthaltsarten (Dringlichkeit = Sonnendosis * Gewicht)
+# ------------------------------------------------------------------
+# Nicht jeder Aufenthaltsort ist gleich dringlich, wenn dort Schatten fehlt.
+# Zwei Kriterien fuer die Gewichte unten: (1) koennen sich die Betroffenen
+# der Sonne selbst entziehen (Standortwahl), (2) sind es besonders
+# hitzevulnerable Gruppen (kleine Kinder, Pflege/Senioren). Fachliche
+# Einschaetzung, keine Norm — im Gemeinderat ggf. offenlegen und begruenden.
+AUFENTHALT_GEWICHTUNG = {
+    "Kindergarten":        1.5,  # kleine Kinder, ganztags draussen, keine Standortwahl
+    "Schule":              1.4,  # viele Kinder, Pausen im Freien, kaum Standortwahl
+    "Soziale Einrichtung": 1.4,  # oft Pflege/Senioren, Hitze schlechter regulierbar
+    "Spielplatz":          1.2,  # Kinder, aber freiwillige/zeitlich flexible Nutzung
+    "Bushaltestelle":      1.1,  # alle Altersgruppen, aber KEINE Standortwahl (Wartepflicht)
+    "Sitzbank":            0.8,  # freiwillige Nutzung, Standort meist selbst waehlbar
+}
+GEWICHT_STANDARD = 1.0   # Fallback fuer nicht gelistete Kategorien (z.B. neue OSM-Tags)
 
 def get_zeitpunkt():
     """DATUM + UHRZEIT + ZEITZONE als tz-bewussten Timestamp (für pybdshadow)."""
