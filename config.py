@@ -45,7 +45,7 @@ RADIUS_M = 800
 # WICHTIG: Der Schatten gilt NUR für diesen Moment. "Schattigster Weg
 # um 14 Uhr" ist um 16 Uhr ein anderer. Eigenschaft des Modells,
 # kein Fehler — muss dem Nutzer klar kommuniziert werden.
-DATUM    = "2026-06-18"      # ISO, YYYY-MM-DD
+DATUM    = "2026-06-21"      # ISO, YYYY-MM-DD
 UHRZEIT = "15:00"           # HH:MM, Ortszeit
 ZEITZONE = "Europe/Berlin"
 

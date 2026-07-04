@@ -40,9 +40,9 @@ LGL_ERFORDERLICH = True
 # LGL-Lader. Der try/except deckt beide Startarten ab: direkt
 # (python modules/loader.py) und Import über run.py.
 try:
-    from modules.lgl_lod2 import lade_lgl_lod2_ordner, QUELLENVERMERK
+    from modules.lgl_lod2 import lade_lgl_lod2_ordner, lade_lgl_lod2_abdeckung, QUELLENVERMERK
 except ImportError:
-    from lgl_lod2 import lade_lgl_lod2_ordner, QUELLENVERMERK
+    from lgl_lod2 import lade_lgl_lod2_ordner, lade_lgl_lod2_abdeckung, QUELLENVERMERK
 
 # --- Modell-Feintuning: Fallback-Annahmen für fehlende Höhen (nur OSM-Weg) ---
 GESCHOSSHOEHE_M = 3.0
@@ -181,19 +181,42 @@ def _lade_gebaeude_lgl():
             )
         return None
 
-    # Fall 3: Kacheln da, decken aber das Gebiet nicht ab
+    # Fall 3: Kacheln da, decken aber das Gebiet nicht (vollstaendig) ab.
+    # WICHTIG: nicht nur pruefen, ob IRGENDEIN Gebaeude im Suchkreis liegt
+    # (treffer.empty) - das faengt nur Totalausfall ab. Bei TEILabdeckung
+    # (z.B. Kacheln nur fuer die Haelfte des Kreises vorhanden) waere
+    # treffer trotzdem nicht leer, und die fehlende Haelfte wuerde still
+    # als "keine Gebaeude -> voll sonnig" durchgehen - ein Datenloch, das
+    # wie ein Messergebnis aussieht. Deshalb: Flaechen-Differenz gebiet
+    # minus Kachel-Abdeckung, nicht nur ein Treffer-Check.
+    #
+    # WICHTIG #2 (Korrektur): die Abdeckung muss aus den Kachel-ENVELOPES
+    # kommen (gml:Envelope, lade_lgl_lod2_abdeckung), NICHT aus der
+    # Vereinigung der Gebaeude-Flaechen. Gebaeude decken nie annaehernd
+    # die ganze Landflaeche ab (Strassen, Gaerten, Felder sind unbebaut) -
+    # ein Vergleich dagegen wuerde IMMER eine grosse, aber bedeutungslose
+    # Luecke zeigen, egal wie vollstaendig die Kacheln tatsaechlich sind.
     gebiet = _analyse_gebiet_25832()
+    abdeckung = lade_lgl_lod2_abdeckung(LGL_KACHEL_DIR)
+    if abdeckung is None:
+        anteil_luecke = 1.0   # kein Envelope lesbar -> Abdeckung unbekannt, lieber stoppen
+    else:
+        luecke = gebiet.difference(abdeckung)
+        anteil_luecke = luecke.area / gebiet.area if gebiet.area else 0
+
     treffer = g[g.intersects(gebiet)].copy()
-    if treffer.empty:
+    if treffer.empty or anteil_luecke > 0.01:   # >1% unabgedeckt = nicht mehr "vollstaendig"
         if LGL_ERFORDERLICH:
             b = g.to_crs(CRS_WGS84).total_bounds
             wo = (f"  Dein ZENTRUM (lon, lat):     {ZENTRUM[1]:.4f}, {ZENTRUM[0]:.4f}\n"
                   if ZENTRUM else f"  Ort (PLACE): {PLACE}\n")
             raise ValueError(
-                f"\nDie Kacheln in {LGL_KACHEL_DIR} decken dein Gebiet nicht ab.\n"
-                f"  Kacheln decken ab (lon/lat): {b[0]:.4f}..{b[2]:.4f} / {b[1]:.4f}..{b[3]:.4f}\n"
+                f"\nDie Kacheln in {LGL_KACHEL_DIR} decken dein Gebiet nicht VOLLSTAENDIG ab "
+                f"({100*anteil_luecke:.1f}% der Flaeche fehlen).\n"
+                f"  Gebaeude-Bounding-Box (lon/lat): {b[0]:.4f}..{b[2]:.4f} / {b[1]:.4f}..{b[3]:.4f}\n"
                 f"{wo}"
-                f"  -> Passt AKTIVER_ORT zu ZENTRUM? Oder fehlende Kachel nachladen."
+                f"  -> Fehlende Kachel(n) nachladen. Teilabdeckung wuerde sonst in der Luecke\n"
+                f"     als 'keine Gebaeude -> voll sonnig' durchgehen, nicht als echtes Ergebnis."
             )
         return None
 

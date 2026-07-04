@@ -523,7 +523,19 @@ def karte_aufenthalt(orte_bewertet, gebiet_25832=None, pfad=None, zeit_label=Non
     o["farbe"] = [cmap(x) if np.isfinite(x) else "#999999" for x in o["sonnendosis"]]
     o["dosis_txt"] = o["sonnendosis"].map(lambda x: f"{x:.2f}" if np.isfinite(x) else "-")
     o["bedarf"] = o["sonnendosis"].map(bedarf)
-    o["name_txt"] = o["name"].map(lambda s: s if s else "(ohne Name)")
+
+    def _name_txt(r):
+        # Fuer unbenannte Orte Koordinaten statt "(ohne Name)" ohne jede
+        # weitere Angabe - sonst im Popup ohne Ortskenntnis nicht
+        # identifizierbar (analog zum Strassennamen-Fallback in vorlage.py,
+        # hier ohne Geh-Graph: reicht fuer die interaktive Karte, o ist
+        # bereits WGS84, also keine Reprojektion noetig).
+        if r["name"]:
+            return r["name"]
+        c = r.geometry.centroid
+        return f"(ohne Name) {c.y:.5f}, {c.x:.5f}"
+
+    o["name_txt"] = o.apply(_name_txt, axis=1)
 
     mitte = o.geometry.union_all().centroid
     m = folium.Map(location=[mitte.y, mitte.x], zoom_start=15, tiles=None, max_zoom=MAX_ZOOM_KARTE)
@@ -564,8 +576,11 @@ def karte_aufenthalt(orte_bewertet, gebiet_25832=None, pfad=None, zeit_label=Non
     gebiet_txt = f"{ZENTRUM[0]:.4f}, {ZENTRUM[1]:.4f} (r {RADIUS_M} m)" if ZENTRUM else PLACE
     info_box(m, {"Zeitfenster": zeit_label, "Gebiet": gebiet_txt,
                  "Lesart": "rot = sonnig = Verschattungsbedarf"},
+             titel="Stadtschatten (Nathalie Gassert)",
              quellen=("Datenquelle Verschattung: LGL, www.lgl-bw.de",
-                      "Aufenthaltsorte: (c) OpenStreetMap-Mitwirkende"))
+                      "Aufenthaltsorte: (c) OpenStreetMap-Mitwirkende",
+                      "OSM kennt fuer manche Orte keinen Namen; Koordinaten "
+                      "dienen der Identifikation vor Ort."))
 
     if ranglisten:
         rangliste_box(m, ranglisten)

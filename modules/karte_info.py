@@ -9,8 +9,15 @@
 #   info_box(m, {"Datum/Uhrzeit": "...", "Gewichtung Alpha": 3, "Radius": "800 m"})
 
 import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import folium
+import geopandas as gpd
+
+from config import CRS_METRISCH, CRS_WGS84
 
 QUELLE_LGL = "Datenquelle: LGL, www.lgl-bw.de"
 QUELLE_OSM = "Kartendaten (c) OpenStreetMap-Mitwirkende"
@@ -62,10 +69,29 @@ def rangliste_box(m, ranglisten, titel="Dringlichkeit je Aufenthaltsart"):
     for kat, df in ranglisten.items():
         if df.empty:
             continue
+
+        # Fuer unbenannte Orte Koordinaten statt "(ohne Name)" ohne jede
+        # weitere Angabe - sonst ist die Zeile in der Rangliste nicht vom
+        # Popup auf der Karte auffindbar (gleicher Fallback wie in
+        # aufenthalt.py karte_aufenthalt() und vorlage.py, hier auf Basis
+        # der Geometrie in df, die noch in CRS_METRISCH vorliegt).
+        fehlt = df["name"].isna() | (df["name"] == "")
+        koordinaten = {}
+        if fehlt.any():
+            punkte_wgs84 = gpd.GeoSeries(
+                df.loc[fehlt].geometry.centroid, crs=CRS_METRISCH).to_crs(CRS_WGS84)
+            koordinaten = {i: f"{p.y:.5f}, {p.x:.5f}"
+                          for i, p in zip(df.loc[fehlt].index, punkte_wgs84)}
+
+        def _anzeige(idx, r):
+            if r["name"]:
+                return r["name"]
+            return f"(ohne Name) {koordinaten.get(idx, '')}"
+
         zeilen = "".join(
-            f"<div>{i + 1}. {(r['name'] or '(ohne Name)')} "
+            f"<div>{i + 1}. {_anzeige(idx, r)} "
             f"<span style='color:#555'>({r['dringlichkeit']:.2f})</span></div>"
-            for i, (_, r) in enumerate(df.iterrows())
+            for i, (idx, r) in enumerate(df.iterrows())
         )
         gewicht = df["gewicht"].iloc[0]
         abschnitte.append(

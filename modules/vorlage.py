@@ -31,6 +31,15 @@
 # 'name'-Attribut. Falls der Aufrufer den Graphen schon geladen hat (z.B.
 # fuer die Fusswege-Verschattung), per graph=... durchreichen statt hier
 # ein zweites Mal zu laden.
+#
+# Fallback-Kette fuer den Namen unbenannter Orte (Stand: zwei Stufen):
+#   1. naechstgelegene Kante im Geh-Graphen hat ein 'name'-Tag -> Strassenname
+#   2. auch die naechste Kante ist unbenannt (oder Suche schlaegt fehl)
+#      -> WGS84-Koordinaten (lat, lon), copy-paste-faehig fuer Google Maps
+#   Reiner "(ohne Name)" ohne jede weitere Angabe sollte damit nicht mehr
+#   vorkommen. Fall real aufgetreten in Denkendorf (eine Sitzbank, deren
+#   naechste Kante ein unbenannter Fussweg ist) - Stufe 2 wurde deshalb
+#   ergaenzt, siehe _strassennamen_ergaenzen().
 
 import os
 import sys
@@ -41,6 +50,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Circle
@@ -71,6 +81,18 @@ if _CONTEXTILY_VERFUEGBAR:
 # dieselbe Skala wie auf den Folium-Karten (branca LinearColormap gruen->gelb->rot)
 _CMAP = LinearSegmentedColormap.from_list("dosis", ["#1a9641", "#ffffbf", "#d7191c"])
 
+# Rang-Labels: Standard-Offset oben rechts vom Punkt. Kandidaten fuer den
+# Fall, dass zwei Orte im Datensatz so nah beieinander liegen, dass sich
+# Punkt UND Zahl ueberdecken (z.B. zwei Orte an derselben Strasse) -
+# _naechster_freier_offset() waehlt dann einen der uebrigen sieben Werte.
+_LABEL_OFFSET_STANDARD = (5, 5)
+_LABEL_OFFSET_KANDIDATEN = [
+    (5, 5), (5, -13), (-14, 5), (-14, -13),
+    (16, -4), (-20, -4), (5, 18), (-14, 18),
+]
+_LABEL_KOLLISIONS_SCHWELLE_PX = 22  # unterhalb dieses Pixelabstands zweier
+                                    # Label-Ankerpunkte gilt es als Ueberlappung
+
 
 def _farbe(dosis):
     """Sonnendosis (0..1) -> RGB-Tupel, dieselbe Skala wie die Folium-Karten."""
@@ -83,7 +105,6 @@ def _farbe(dosis):
 def _mittelpunkt_metrisch():
     """ZENTRUM (lat, lon) -> (x, y) in CRS_METRISCH, fuer Gebietskreis/Ausschnitt.
     None, wenn ZENTRUM nicht gesetzt (ganzer Ort - kein sinnvoller Kreis)."""
-    import geopandas as gpd
     from shapely.geometry import Point
     if ZENTRUM is None:
         return None
@@ -113,6 +134,46 @@ def _nordpfeil(ax):
                arrowprops=dict(arrowstyle="-|>", color="#222", lw=1.5))
 
 
+def _naechster_freier_offset(ax, x_daten, y_daten, bereits_platziert_px):
+    """
+    Waehlt fuer ein Rang-Label am Punkt (x_daten, y_daten) einen Offset aus
+    _LABEL_OFFSET_KANDIDATEN, der nicht mit bereits platzierten Labels
+    kollidiert (Pixelabstand < _LABEL_KOLLISIONS_SCHWELLE_PX).
+
+    Grund: liegen zwei Orte im Datensatz nah beieinander (z.B. zwei
+    Aufenthaltsorte an derselben Strasse), ueberdecken sich bei einem festen
+    Offset sowohl die Punkte als auch ihre Rang-Zahlen. Kollisionspruefung
+    in Pixelkoordinaten (ax.transData), nicht in Metern, weil die visuelle
+    Ueberlappung vom Massstab der Karte abhaengt, nicht vom Datenabstand.
+
+    Rueckgabe: (dx, dy) in Punkten (fuer xytext) sowie die neue Liste
+    bereits_platziert_px (Seiteneffekt: der gewaehlte Ankerpunkt wird
+    angehaengt, damit nachfolgende Labels dagegen pruefen).
+    """
+    x_px, y_px = ax.transData.transform((x_daten, y_daten))
+
+    def _kollidiert(dx, dy):
+        lx, ly = x_px + dx, y_px + dy
+        return any(((lx - px) ** 2 + (ly - py) ** 2) ** 0.5 < _LABEL_KOLLISIONS_SCHWELLE_PX
+                  for px, py in bereits_platziert_px)
+
+    for dx, dy in _LABEL_OFFSET_KANDIDATEN:
+        if not _kollidiert(dx, dy):
+            bereits_platziert_px.append((x_px + dx, y_px + dy))
+            return dx, dy
+
+    # Alle Kandidaten kollidieren (sehr dichter Cluster, >8 Orte an
+    # praktisch derselben Stelle) - den nehmen, der am weitesten von allen
+    # bereits platzierten Labels entfernt ist, statt stur beim Standard zu
+    # bleiben.
+    dx, dy = max(
+        _LABEL_OFFSET_KANDIDATEN,
+        key=lambda o: min(((x_px + o[0] - px) ** 2 + (y_px + o[1] - py) ** 2) ** 0.5
+                          for px, py in bereits_platziert_px))
+    bereits_platziert_px.append((x_px + dx, y_px + dy))
+    return dx, dy
+
+
 def _karte(ax, orte_bewertet, top_flach):
     """Hintergrund: Kartenkacheln (falls verfuegbar) + alle erfassten Orte
     grau (Kontext). Vordergrund: Top-Orte farbig nach Sonnendosis +
@@ -130,12 +191,15 @@ def _karte(ax, orte_bewertet, top_flach):
         ax.set_xlim(mp[0] - RADIUS_M * 1.1, mp[0] + RADIUS_M * 1.1)
         ax.set_ylim(mp[1] - RADIUS_M * 1.1, mp[1] + RADIUS_M * 1.1)
 
+    label_positionen_px = []  # bereits vergebene Label-Ankerpunkte in Pixeln,
+                              # fuer die Kollisionspruefung nachfolgender Labels
     for _, r in top_flach.iterrows():
         c = r.geometry.centroid
         ax.scatter([c.x], [c.y], s=90, color=_farbe(r["sonnendosis"]),
                   edgecolor="#222", linewidth=0.8, zorder=3)
+        offset = _naechster_freier_offset(ax, c.x, c.y, label_positionen_px)
         ax.annotate(str(int(r["rang"])), (c.x, c.y), textcoords="offset points",
-                   xytext=(5, 5), fontsize=8, fontweight="bold", color="#111", zorder=4)
+                   xytext=offset, fontsize=8, fontweight="bold", color="#111", zorder=4)
 
     # Basiskarte NACH allen datengetriebenen xlim/ylim-Aenderungen einfuegen,
     # sonst rechnet contextily die Achsen von den Punkten aus neu statt vom
@@ -176,11 +240,28 @@ def _karte(ax, orte_bewertet, top_flach):
     return basemap_ok
 
 
+def _koordinaten_text(punkte_metrisch):
+    """GeoSeries von Punkten in CRS_METRISCH -> dict {index: "lat, lon"-Text}
+    in WGS84, gerundet auf 5 Nachkommastellen (~1 m Genauigkeit) - copy-paste-
+    faehig fuer Google Maps o.ae."""
+    punkte_wgs84 = gpd.GeoSeries(punkte_metrisch, crs=CRS_METRISCH).to_crs(CRS_WGS84)
+    return {i: f"{p.y:.5f}, {p.x:.5f}" for i, p in zip(punkte_metrisch.index, punkte_wgs84)}
+
+
 def _strassennamen_ergaenzen(top_flach, graph=None):
     """
     Fuer Orte ohne Namen: naechstgelegene Kante im Geh-Graphen (loader.py)
     nachschlagen und deren Strassenname als zweite Zeile im Namensfeld
     anzeigen. Ergaenzt top_flach um die Spalte "anzeige_name".
+
+    Zwei-stufiger Fallback:
+      1. naechste Kante hat ein 'name'-Tag -> Strassenname
+      2. naechste Kante ist selbst unbenannt (z.B. unbenannter Fussweg/
+         Parkplatzweg) ODER die Kantensuche schlaegt insgesamt fehl
+         -> WGS84-Koordinaten statt gar nichts. Reines "(ohne Name)" ohne
+         jede weitere Angabe ist damit kein Endzustand mehr, sondern nur
+         ein Zwischenschritt, falls beide Stufen leer bleiben (sollte nicht
+         vorkommen, da Stufe 2 keine externen Abhaengigkeiten hat).
 
     graph : bereits geladener, auf CRS_METRISCH projizierter Geh-Graph
             (loader.lade_geh_graph()). None -> wird nur bei Bedarf selbst
@@ -190,6 +271,7 @@ def _strassennamen_ergaenzen(top_flach, graph=None):
     top_flach = top_flach.reset_index(drop=True)
     fehlend_idx = [i for i, n in enumerate(top_flach["name"]) if not n]
 
+    # Stufe 1: Strassenname der naechstgelegenen Kante im Geh-Graphen
     strassen = {}
     if fehlend_idx:
         if graph is None:
@@ -211,7 +293,19 @@ def _strassennamen_ergaenzen(top_flach, graph=None):
                  f"{len(fehlend_idx)} gefunden (naechstgelegene Kante im Geh-Graphen).")
         except Exception as e:
             print(f"  Warnung: Strassennamen konnten nicht ermittelt werden ({e}). "
-                 f"Tabelle zeigt fuer unbenannte Orte nur '(ohne Name)'.")
+                 f"Tabelle zeigt fuer unbenannte Orte Koordinaten statt Strassennamen.")
+
+    # Stufe 2: Koordinaten fuer alle, die nach Stufe 1 immer noch keinen
+    # Namen haben (unbenannte naechste Kante ODER Kantensuche fehlgeschlagen)
+    koord_noetig = [i for i in fehlend_idx if i not in strassen]
+    koordinaten = {}
+    if koord_noetig:
+        punkte = top_flach.loc[koord_noetig].geometry.centroid
+        koordinaten = _koordinaten_text(punkte)
+        anzahl_ueber_stufe2 = len(koordinaten)
+        if anzahl_ueber_stufe2:
+            print(f"  Koordinaten-Fallback (Stufe 2) fuer {anzahl_ueber_stufe2} Ort(e) "
+                 f"ohne Strassenname noch in Reichweite verwendet.")
 
     anzeige = []
     for i, r in top_flach.iterrows():
@@ -219,6 +313,8 @@ def _strassennamen_ergaenzen(top_flach, graph=None):
             anzeige.append(r["name"])
         elif i in strassen:
             anzeige.append(f"(ohne Name)\n{strassen[i]}")
+        elif i in koordinaten:
+            anzeige.append(f"(ohne Name)\n{koordinaten[i]}")
         else:
             anzeige.append("(ohne Name)")
     top_flach["anzeige_name"] = anzeige
@@ -228,8 +324,8 @@ def _strassennamen_ergaenzen(top_flach, graph=None):
 def _tabelle(ax, top_flach):
     """Tabelle rechts: Rang, Aufenthaltsart, Name, Dosis, Gewicht, Dringlichkeit -
     dieselbe Reihenfolge/Nummerierung wie auf der Karte. Name-Spalte nutzt
-    "anzeige_name" (ggf. zweizeilig: "(ohne Name)" + Strasse darunter,
-    siehe _strassennamen_ergaenzen)."""
+    "anzeige_name" (ggf. zweizeilig: "(ohne Name)" + Strasse/Koordinaten
+    darunter, siehe _strassennamen_ergaenzen)."""
     ax.axis("off")
     spalten = ["Nr.", "Aufenthaltsart", "Name", "Dosis", "Gewicht", "Dringlichkeit"]
     zeilen = []
@@ -248,8 +344,9 @@ def _tabelle(ax, top_flach):
             cell.set_text_props(fontweight="bold")
             cell.set_facecolor("#e8e8e8")
         elif "\n" in zeilen[row - 1][2]:
-            # zweizeiliger Name (ohne Name) + Strasse: Zeile hoeher, sonst
-            # ueberlappt die zweite Zeile die naechste Tabellenzeile
+            # zweizeiliger Name (ohne Name) + Strasse/Koordinaten: Zeile
+            # hoeher, sonst ueberlappt die zweite Zeile die naechste
+            # Tabellenzeile
             cell.set_height(cell.get_height() * 1.8)
 
 
@@ -289,6 +386,8 @@ def exportiere_vorlage(orte_bewertet, ranglisten, pfad=None, top_je_kategorie=3,
     zeitfenster = f"{DATUM}, {AGG_START_STUNDE:02d}-{AGG_END_STUNDE:02d} Uhr (Tagesmittel)"
     ax_titel.text(0, 0.8, "Stadtschatten - Verschattungsbedarf: Top-Orte je Aufenthaltsart",
                  fontsize=15, fontweight="bold", va="top")
+    ax_titel.text(0, 0.45, "(Nathalie Gassert)",
+                 fontsize=9, color="#444", va="top")
     ax_titel.text(0, 0.15,
                  f"{PLACE}  |  Zeitfenster: {zeitfenster}  |  Dringlichkeit = Sonnendosis "
                  f"x Gewicht je Aufenthaltsart (fachliche Gewichtung, siehe Anlage)  |  "
@@ -307,6 +406,10 @@ def exportiere_vorlage(orte_bewertet, ranglisten, pfad=None, top_je_kategorie=3,
     ]
     if basemap_ok:
         attribution_teile.append(f"Kartenhintergrund: {_BASEMAP_ATTRIBUTION}")
+    attribution_teile.append(
+        "OSM kennt fuer manche Orte keinen Namen; Koordinaten dienen der "
+        "Identifikation vor Ort."
+    )
     attribution_teile.append(
         "Screening-Ebene: Momentaufnahme fuer das genannte Zeitfenster, "
         "kein Ersatz fuer eine Einzelfallpruefung."

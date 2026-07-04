@@ -71,6 +71,35 @@ weitgehend auf; nur der absolute Sonnenanteil ist minimal überschätzt.
 
 ---
 
+### Kachel-Abdeckungsprüfung: Bugfix (kritisch)
+
+`LGL_ERFORDERLICH`/`NDOM_ERFORDERLICH` sollen stoppen, wenn Kacheln das Suchgebiet
+nicht vollständig abdecken. Die Prüfung verglich fälschlich gegen die Vereinigung der
+**Gebäude-Flächen** statt gegen die tatsächliche **Kachel-Ausdehnung** (`gml:Envelope`
+bei LoD2, Raster-Bounds beim nDOM). Eine Kachellücke ohne Gebäude blieb dadurch
+unentdeckt und ging als "voll sonnig" (Dosis 1.0) in die Auswertung ein – ein Fehler,
+der sich nicht durch Plausibilität in der Karte zeigt, sondern nur durch falsch hohe
+Werte an der Lücke selbst.
+
+Konkret betroffen in Denkendorf: Mühlhalden-Kindergarten und mehrere Bushaltestellen
+in der Rangliste (Werte vor dem Fix nicht vertrauenswürdig, keine Neuberechnung mit
+alten Daten sinnvoll).
+
+Behoben in `modules/lgl_lod2.py` (neue Funktion `lade_lgl_lod2_abdeckung`, prüft gegen
+die echte Kachelgeometrie) und `modules/loader.py`. Zwei Diagnoseskripte zur
+Verifikation:
+
+- `pruef_abdeckung.py` — LGL-LoD2-Abdeckung
+- `pruef_abdeckung_ndom.py` — nDOM-Abdeckung
+
+Beide bestätigen aktuell 0,0 % Lücke im 800-m-Radius für Denkendorf.
+
+**Lektion für jede künftige Abdeckungsprüfung:** nie gegen eine abgeleitete Teilmenge
+(Gebäude, Punkte, o. ä.) vergleichen — immer gegen die tatsächliche Kachel-/
+Raster-Ausdehnung selbst.
+
+---
+
 ## Zeit-Aggregation: Sonnendosis (v3)
 
 Statt eines einzelnen Moments lässt sich der Sonnenanteil über ein Stundenfenster mitteln –
@@ -290,6 +319,36 @@ Zwei optionale Erweiterungen (v4.2):
   keine neue Abhängigkeit. Graph wird nur bei Bedarf geladen (Cache-Hit ist schnell, aber
   unnötig, wenn ohnehin alle Orte einen Namen haben).
 
+**Koordinaten-Fallback für unbenannte Orte (v4.3):** OSM kennt für einen Teil der
+Aufenthaltsorte (v. a. Sitzbänke) keinen Namen – bislang stand dort schlicht
+"(ohne Name)", ohne weitere Angabe. Betrifft alle drei Ausgaben (PDF-Tabelle,
+Karten-Popup, Dringlichkeits-Rangliste), mit unterschiedlicher Tiefe:
+
+| Ausgabe | Fallback |
+|---|---|
+| `vorlage.py` (PDF-Tabelle) | Straßenname (Geh-Graph) → Koordinaten |
+| `aufenthalt.py` (Karten-Popup) | Koordinaten |
+| `karte_info.py` (Rangliste-Box) | Koordinaten |
+
+Grund für die Lücke davor: die Rangliste-Box griff nur auf `name`, nicht auf die
+Geometrie zu – ein unbenannter Ort blieb dort ohne jede Zusatzangabe, obwohl
+Popup und PDF für denselben Ort längst Koordinaten bzw. Straßennamen zeigten.
+Damit war ein Ort in der Karte nicht mit seiner Zeile in der Rangliste
+abgleichbar (z. B. eine Sitzbank mit Dosis 0,53 – nicht in den sichtbaren
+Top-5, aber ohne Koordinate auch nicht auffindbar, welche der vielen anderen
+Sitzbänke das eigentlich war). Alle drei Stellen liefern jetzt mindestens
+Koordinaten. Bewusst NICHT vereinheitlicht auf den vollen Straßennamen-Fallback:
+das würde den Geh-Graphen auch in `aufenthalt.py`/`karte_info.py` voraussetzen,
+die Module laufen aber laut `ablauf.md` als getrennte Skript-Aufrufe – der
+Graph ließe sich nicht ohne Pipeline-Umbau (ein Lauf statt vier, oder
+Platten-Cache) einmal laden und für alle drei nutzen. Siehe *Ausblick*.
+
+**Label-Kollisionsvermeidung (v4.3):** Liegen zwei Top-Orte auf der PDF-Karte
+nah beieinander (z. B. zwei Orte an derselben Straße), überdeckten sich Punkt
+UND Rang-Nummer bei festem Text-Offset. `_naechster_freier_offset()` prüft
+acht Ausweich-Richtungen in Pixelkoordinaten und wählt die erste
+kollisionsfreie; bei sehr dichten Clustern (>8 Orte praktisch am selben Fleck)
+die mit dem größten Mindestabstand zu bereits platzierten Labels.
 ---
 
 ## Installation & Nutzung
@@ -404,7 +463,9 @@ identisch mit dem CRS der LGL-Daten (LoD2 *und* nDOM), daher kein Umprojizieren 
 | `AUFENTHALT_CLUSTER_PUFFER_M` von `aufenthalt.py` nach `config.py` zentralisieren | ⬜ offen |
 | `OUTPUT_DIR`-Doppeldefinition in `config.py` beheben (zweite Zuweisung überschrieb die ort-abhängige) | ✅ behoben |
 | Aufenthaltsorte feiner (Bänke, Pflegeheime, weitere Tags) | ⬜ offen |
-
+| **Abdeckungsprüfung repariert (verglich vorher fälschlich gegen Gebäudeflächen statt Kachel-Ausdehnung; betraf Mühlhalden-Kindergarten + Bushaltestellen)** | ✅ |
+| Koordinaten-Fallback für unbenannte Orte (PDF, Popup, Rangliste-Box konsistent) | ✅ |
+| Label-Kollisionsvermeidung auf der PDF-Karte (dicht beieinanderliegende Orte) | ✅ |
 ---
 
 ## Validierung
@@ -502,7 +563,12 @@ Fehlerquote potenziell höher als in Denkendorf.
 - **Kronen-Transmissivität** als optionaler Premium-Pfad (SOLWEIG-Anbindung), wenn echte
   thermische Komfortanalyse gefragt ist.
 - Weitere Städte.
-
+- **Namens-Fallback vereinheitlichen:** aktuell drei unabhängige Implementierungen
+  (siehe Abschnitt *Gemeinderatsvorlage*, Koordinaten-Fallback) mit
+  unterschiedlicher Tiefe. Zusammenführen in ein gemeinsames Modul würde den
+  Geh-Graphen auch in `aufenthalt.py`/`karte_info.py` voraussetzen – lohnt sich
+  erst nach einem Pipeline-Umbau (ein Lauf statt vier getrennter Skripte, oder
+  Graph-Cache auf Platte). Zurückgestellt, nicht vergessen.
 ---
 
 ## Datenlizenz

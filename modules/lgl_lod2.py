@@ -32,7 +32,7 @@ import glob
 import xml.etree.ElementTree as ET
 
 import geopandas as gpd
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
 
 CRS_LGL = "EPSG:25832"                       # ETRS89/UTM32 - native Lage der Kacheln
@@ -136,6 +136,40 @@ def lade_lgl_lod2_ordner(ordner, muster="LoD2_*.gml", **kw):
         raise FileNotFoundError(f"Keine Kacheln unter {ordner}/{muster}")
     teile = [lade_lgl_lod2(p, **kw) for p in pfade]
     return gpd.GeoDataFrame(pd.concat(teile, ignore_index=True), crs=CRS_LGL)
+
+
+_ENVELOPE = "{%s}Envelope" % _GML
+_LOWER = "{%s}lowerCorner" % _GML
+_UPPER = "{%s}upperCorner" % _GML
+
+
+def _envelope(pfad):
+    """Liest NUR das umschliessende Rechteck (gml:boundedBy/Envelope) einer
+    Kachel - die Flaeche, die die Kachel tatsaechlich ABDECKT, unabhaengig
+    davon, ob dort zufaellig Gebaeude stehen. Fuer Abdeckungspruefungen:
+    ein Vergleich gegen die Gebaeude-Flaeche allein ist dafuer UNGEEIGNET,
+    weil die meiste Landflaeche unbebaut ist (Strassen, Gaerten, Felder) -
+    das wuerde immer eine grosse, aber bedeutungslose Luecke zeigen, egal
+    wie vollstaendig die Kacheln tatsaechlich sind."""
+    for _, elem in ET.iterparse(pfad, events=("end",)):
+        if elem.tag == _ENVELOPE:
+            lower = [float(v) for v in elem.find(_LOWER).text.split()]
+            upper = [float(v) for v in elem.find(_UPPER).text.split()]
+            return box(lower[0], lower[1], upper[0], upper[1])
+    return None
+
+
+def lade_lgl_lod2_abdeckung(ordner, muster="LoD2_*.gml"):
+    """Tatsaechliche Flaechenabdeckung aller Kacheln in einem Ordner - die
+    Vereinigung der Kachel-ENVELOPES (nicht der Gebaeude). Fuer
+    Abdeckungspruefungen (siehe loader._lade_gebaeude_lgl). None, wenn
+    kein Envelope lesbar war (z.B. andere GML-Struktur als erwartet -
+    dann lieber laut nichts zurueckgeben als eine falsche Flaeche)."""
+    pfade = sorted(glob.glob(os.path.join(ordner, muster)))
+    envelopes = [e for e in (_envelope(p) for p in pfade) if e is not None]
+    if not envelopes:
+        return None
+    return gpd.GeoSeries(envelopes, crs=CRS_LGL).union_all()
 
 
 if __name__ == "__main__":
