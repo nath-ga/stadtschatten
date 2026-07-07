@@ -21,6 +21,7 @@ from shapely.geometry import LineString, Point
 from config import (CRS_METRISCH, CRS_WGS84, OUTPUT_DIR, START, ZIEL,
                     ZENTRUM, RADIUS_M, PLACE, ALPHA_SCHATTIG, get_zeitpunkt)
 from modules.karte_info import info_box
+from modules.kartenbasis import basis_layer
 
 
 def _latlon_zu_metrisch(latlon):
@@ -126,11 +127,7 @@ def karte_route(G, routen, pfad=None):
     mitte = ((start_ll[0] + ziel_ll[0]) / 2, (start_ll[1] + ziel_ll[1]) / 2)
 
     m = folium.Map(location=mitte, zoom_start=16, tiles=None)
-    folium.TileLayer("CartoDB positron", name="Karte").add_to(m)
-    folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri World Imagery", name="Satellit",
-    ).add_to(m)
+    basis_layer(m)
 
     def linie_latlon(linie):
         s = gpd.GeoSeries([linie], crs=CRS_METRISCH).to_crs(CRS_WGS84).iloc[0]

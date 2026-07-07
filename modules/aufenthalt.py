@@ -49,6 +49,7 @@ from config import (CRS_METRISCH, CRS_WGS84, OUTPUT_DIR, ZENTRUM, RADIUS_M, PLAC
                     AUFENTHALT_PUNKT_PUFFER_M, BUSHALT_DEDUP_M, MAX_ZOOM_KARTE,
                     AUFENTHALT_GEWICHTUNG, GEWICHT_STANDARD)
 from modules.karte_info import info_box, rangliste_box
+from modules.kartenbasis import basis_layer
 from modules.nutzung import lade_dosis_tif, NODATA
 
 
@@ -539,10 +540,7 @@ def karte_aufenthalt(orte_bewertet, gebiet_25832=None, pfad=None, zeit_label=Non
 
     mitte = o.geometry.union_all().centroid
     m = folium.Map(location=[mitte.y, mitte.x], zoom_start=15, tiles=None, max_zoom=MAX_ZOOM_KARTE)
-    folium.TileLayer("CartoDB positron", name="Karte", max_zoom=MAX_ZOOM_KARTE).add_to(m)
-    folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri World Imagery", name="Satellit", max_zoom=MAX_ZOOM_KARTE).add_to(m)
+    basis_layer(m, max_zoom=MAX_ZOOM_KARTE)
 
     def stil(feat):
         return {"fillColor": feat["properties"]["farbe"], "color": "#333",

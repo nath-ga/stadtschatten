@@ -83,8 +83,8 @@ ZIEL  = None
 #   w = laenge * (1 + ALPHA * sonnenanteil)
 #   ALPHA = 0   -> schnellster Weg (Schatten egal)
 #   ALPHA hoch  -> schattigster Weg (Umwege werden in Kauf genommen)
-ALPHA_SCHATTIG = 15.0
-ALPHA_SCHNELL  = 0.0
+ALPHA_SCHATTIG = 30.0
+ALPHA_SCHNELL  = 5.0
 
 # ------------------------------------------------------------------
 # Koordinatensysteme
@@ -114,14 +114,16 @@ DETAIL_PUNKT_LATLON = None
 # ------------------------------------------------------------------
 # Gemeinsamer Zoom-Deckel fuer alle drei Auswertungskarten (exposition,
 # nutzung, aufenthalt). Zweck: Nutzer nicht weiter reinzoomen lassen, als
-# tatsaechlich Bildinformation da ist - sonst wird es nur eine haesslich
-# hochskalierte Kachel (Esri World Imagery) bzw. sichtbar klotzige
-# Rasterzellen (die 2m-Sonnendosis, ab ~19 blockig).
-# Handempirisch pruefen: im Browser auf die Satellit-Ebene stellen, in
-# Denkendorf so weit reinzoomen bis Kacheln nicht mehr schaerfer werden
-# (DevTools -> Network: gleiche Kachel wird nur noch hochskaliert) -
-# das ist die Zahl hier. Wert gilt je Ort; bei anderer Stadt (dichter
-# LGL/Esri-Abdeckung) ggf. hochsetzen.
+# tatsaechlich Bildinformation da ist - der limitierende Faktor ist das
+# eigene 2m-Sonnendosis-Raster, das ab ~19 sichtbar blockig wird (CartoDB
+# Positron selbst liefert bis in hohe Zoomstufen scharfe Kacheln, ist also
+# nicht der Flaschenhals).
+# Handempirisch pruefen: im Browser auf die Kartenebene "Karte" stellen, in
+# Denkendorf so weit reinzoomen, bis die Rasterzellen sichtbar grob werden -
+# das ist die Zahl hier. Wert ist an das AGG_RASTER_M oben gekoppelt: groebere
+# Zellgroesse -> frueher blockig -> MAX_ZOOM_KARTE eher senken, und umgekehrt.
+# Frueher zusaetzlich gegen die Esri-World-Imagery-Ebene geprueft - die ist
+# aus Lizenzgruenden entfernt (siehe ablauf.md, modules/kartenbasis.py).
 MAX_ZOOM_KARTE = 19
 
 # ------------------------------------------------------------------

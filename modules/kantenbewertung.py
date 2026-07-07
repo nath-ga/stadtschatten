@@ -31,6 +31,7 @@ import osmnx as ox
 from config import (CRS_METRISCH, CRS_WGS84, OUTPUT_DIR, ZENTRUM, RADIUS_M, PLACE,
                     ALPHA_SCHATTIG, ALPHA_SCHNELL, get_zeitpunkt, get_zeitpunkt_stunde)
 from modules.karte_info import info_box
+from modules.kartenbasis import basis_layer
 
 # Abstand der Stuetzpunkte entlang jeder Kante. Kleiner = genauer, aber mehr Punkte.
 SAMPLE_ABSTAND_M = 5.0
@@ -203,12 +204,7 @@ def karte_kanten(edges, schatten=None, pfad=None, zeit_label=None):
     e = edges[["geometry", "sonnenanteil"]].to_crs(CRS_WGS84)
     mitte = e.geometry.union_all().centroid
     m = folium.Map(location=[mitte.y, mitte.x], zoom_start=17, tiles=None)
-
-    folium.TileLayer("CartoDB positron", name="Karte").add_to(m)
-    folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri World Imagery", name="Satellit",
-    ).add_to(m)
+    basis_layer(m)
 
     if schatten is not None:
         folium.GeoJson(

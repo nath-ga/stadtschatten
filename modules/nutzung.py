@@ -41,6 +41,7 @@ from config import (CRS_METRISCH, CRS_WGS84, OUTPUT_DIR, ZENTRUM, RADIUS_M, PLAC
                     AGG_START_STUNDE, AGG_END_STUNDE,
                     ALKIS_FLURSTUECK_PFAD, MIN_FREIFLAECHE_M2, MAX_ZOOM_KARTE)
 from modules.karte_info import info_box
+from modules.kartenbasis import basis_layer
 
 NODATA = -9999.0   # muss zum Wert in exposition.py passen
 
@@ -216,11 +217,7 @@ def karte_nutzung(fl_bewertet, gebiet_25832=None, pfad=None, zeit_label=None,
 
     mitte = fl_wgs.geometry.union_all().centroid
     m = folium.Map(location=[mitte.y, mitte.x], zoom_start=16, tiles=None, max_zoom=MAX_ZOOM_KARTE)
-    folium.TileLayer("CartoDB positron", name="Karte", max_zoom=MAX_ZOOM_KARTE).add_to(m)
-    folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri World Imagery", name="Satellit", max_zoom=MAX_ZOOM_KARTE,
-    ).add_to(m)
+    basis_layer(m, max_zoom=MAX_ZOOM_KARTE)
 
     # Default-Ebene: alle Flurstuecke zusammen
     alle = folium.FeatureGroup(name="Alle Flurstuecke", show=True)
@@ -259,6 +256,13 @@ def karte_flurstueck_detail(flurstuecke, dosis, transform, punkt_latlon,
     grau, Flurstuecksgrenze als Umriss, Mittelwert beschriftet. Macht den
     Zwischenschritt 'Zellen -> Mittel je Flurstueck' sichtbar - das Werkzeug,
     um z.B. 'warum ist mein Haus schattig' transparent zu erklaeren.
+
+    Frueher zusaetzlich mit Esri-World-Imagery-Luftbild, damit man beim
+    Erklaeren einzelne Zellen gegen "das ist das Dach"/"das ist der Baum" im
+    echten Foto abgleichen konnte. Der Esri-Layer ist aus Lizenzgruenden
+    entfernt (siehe ablauf.md) und NICHT ersetzt - Ersatz durch das offene
+    LGL-ATKIS-Orthophoto ist vorgesehen, sobald die WMS/WMTS-URL aus
+    opengeodata.lgl-bw.de vorliegt.
 
     punkt_latlon : (lat, lon) irgendwo im gewuenschten Flurstueck
                    (auf der Uebersichtskarte anklicken, Koordinate ablesen).
@@ -313,10 +317,7 @@ def karte_flurstueck_detail(flurstuecke, dosis, transform, punkt_latlon,
 
     mitte = gpd.GeoSeries([parz.geometry.centroid], crs=CRS_METRISCH).to_crs(CRS_WGS84).iloc[0]
     m = folium.Map(location=[mitte.y, mitte.x], zoom_start=20, max_zoom=22, tiles=None)
-    folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri World Imagery", name="Satellit", max_zoom=22).add_to(m)
-    folium.TileLayer("CartoDB positron", name="Karte", max_zoom=22).add_to(m)
+    basis_layer(m, max_zoom=22)
 
     folium.GeoJson(
         z_wgs[["geometry", "farbe", "label"]], name="Zellen",

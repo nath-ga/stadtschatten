@@ -39,6 +39,7 @@ from config import (CRS_METRISCH, CRS_WGS84, OUTPUT_DIR, AGG_RASTER_M,
                     get_zeitpunkt_stunde, MAX_ZOOM_KARTE)
 from modules.schatten import berechne_schatten
 from modules.karte_info import info_box
+from modules.kartenbasis import basis_layer
 
 NODATA = -9999.0   # ausserhalb des Suchgebiets ODER auf einem Gebaeude (Dach)
 
@@ -184,9 +185,16 @@ def _dosis_rgba(dosis_wgs):
 
 
 def karte_dosis(dosis, transform, pfad=None, zeit_label=None):
-    """Zeichnet das Sonnendosis-Raster halbtransparent ueber Karte + Satellit.
-    Das ist der Validierungs-Check: Muster gegen das Orthofoto pruefen.
-    Ausgestanzte Gebaeude erscheinen transparent (Orthofoto scheint durch)."""
+    """Zeichnet das Sonnendosis-Raster halbtransparent ueber die Karte.
+
+    Frueher zusaetzlich mit Esri-World-Imagery-Luftbild als Validierungs-
+    Check (Muster gegen das Orthofoto pruefen). Der Esri-Layer ist aus
+    Lizenzgruenden entfernt (siehe ablauf.md) und NICHT ersetzt - der
+    visuelle Foto-Abgleich faellt bis auf Weiteres weg. Ausstehend: Ersatz
+    durch das offene LGL-ATKIS-Orthophoto (WMS/WMTS, Datenlizenz
+    Deutschland - Namensnennung 2.0, ausdruecklich auch kommerziell nutzbar),
+    sobald die konkrete Dienst-URL aus opengeodata.lgl-bw.de vorliegt.
+    Ausgestanzte Gebaeude erscheinen weiterhin transparent."""
     import folium
     from branca.colormap import LinearColormap
 
@@ -199,11 +207,7 @@ def karte_dosis(dosis, transform, pfad=None, zeit_label=None):
 
     m = folium.Map(location=[(sued + nord) / 2, (west + ost) / 2],
                    zoom_start=17, tiles=None, max_zoom=MAX_ZOOM_KARTE)
-    folium.TileLayer("CartoDB positron", name="Karte", max_zoom=MAX_ZOOM_KARTE).add_to(m)
-    folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri World Imagery", name="Satellit", max_zoom=MAX_ZOOM_KARTE,
-    ).add_to(m)
+    basis_layer(m, max_zoom=MAX_ZOOM_KARTE)
 
     folium.raster_layers.ImageOverlay(
         image=img, bounds=[[sued, west], [nord, ost]],

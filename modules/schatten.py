@@ -19,6 +19,7 @@ import pybdshadow
 
 from config import CRS_METRISCH, CRS_WGS84, OUTPUT_DIR, ZENTRUM, RADIUS_M, PLACE, get_zeitpunkt
 from modules.karte_info import info_box
+from modules.kartenbasis import basis_layer
 
 
 def berechne_schatten(gebaeude, zeitpunkt=None):
@@ -62,7 +63,7 @@ def schatten_union(schatten):
 def karte_schatten(gebaeude, schatten, pfad=None):
     """
     Zeichnet Gebäude (grau) und Schatten (blau, halbtransparent) auf eine Folium-Karte.
-    Das ist der Validierungs-Check: Schatten gegen Satellitenbild prüfen.
+    Das ist der Validierungs-Check: Schatten gegen die Karte prüfen.
     """
     import folium
 
@@ -75,13 +76,8 @@ def karte_schatten(gebaeude, schatten, pfad=None):
     sch_wgs = schatten.to_crs(CRS_WGS84)
 
     mitte = geb_wgs.geometry.union_all().centroid
-    m = folium.Map(location=[mitte.y, mitte.x], zoom_start=17,
-                   tiles="CartoDB positron")
-    # Satelliten-Layer zum direkten Abgleich
-    folium.TileLayer(
-        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attr="Esri World Imagery", name="Satellit", overlay=False, control=True
-    ).add_to(m)
+    m = folium.Map(location=[mitte.y, mitte.x], zoom_start=17, tiles=None)
+    basis_layer(m)
 
     folium.GeoJson(
         sch_wgs, name="Schatten",

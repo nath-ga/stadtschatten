@@ -447,7 +447,6 @@ identisch mit dem CRS der LGL-Daten (LoD2 *und* nDOM), daher kein Umprojizieren 
 | Wege = Bürgersteig statt Straßenachse (Schattenseiten-Sampling) | ⬜ offen |
 | Kachel-Auswahl je Gebiet + Höhen-Cache (Skalierung) | ⬜ offen |
 | GPX-Export | ⬜ optional, offen |
-
 | Flächige Sonnendosis (Raster, exposition.py) | ✅ |
 | Dächer ausgestanzt (LoD2-Footprints raus, Vegetation bleibt) | ✅ |
 | Sonnendosis × ALKIS-Nutzung (Zonal, Klassentabelle, nutzung.py) | ✅ |
