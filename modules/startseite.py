@@ -30,6 +30,12 @@ KARTEN = [
      "Verschattungsbedarf an Aufenthaltsorten",
      "Schulen, Spielplätze, Bushaltestellen und Bänke, bewertet nach Sonne: "
      "rot heißt sonniger Aufenthaltsort – hier bringt Schatten am meisten."),
+    ("route.html", "Beispiel",
+     "Schattigster vs. schnellster Weg",
+     "Ein Einzelbeispiel zwischen zwei festen Punkten: wie stark weicht der "
+     "schattigste Weg vom schnellsten ab, und welcher Umweg wird dafür in Kauf "
+     "genommen? Keine flächendeckende Auswertung wie die drei Karten oben, "
+     "sondern eine Demonstration des Abwägungs-Prinzips für eine Route."),
 ]
 
 HINWEISE = [
@@ -170,7 +176,7 @@ def baue_startseite(pfad=None):
   <footer>
     Datenquelle Verschattung: LGL, www.lgl-bw.de (LoD2, nDOM1, ALKIS)<br>
     Aufenthaltsorte: © OpenStreetMap-Mitwirkende<br>
-    Erstellt mit Stadtschatten.
+    © Nathalie Gassert · Stadtschatten · github.com/nath-ga/stadtschatten
   </footer>
 </div></body></html>"""
 

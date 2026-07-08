@@ -21,6 +21,7 @@ from config import CRS_METRISCH, CRS_WGS84
 
 QUELLE_LGL = "Datenquelle: LGL, www.lgl-bw.de"
 QUELLE_OSM = "Kartendaten (c) OpenStreetMap-Mitwirkende"
+AUTOR = "© Nathalie Gassert · Stadtschatten · github.com/nath-ga/stadtschatten"
 
 
 def info_box(m, parameter, quellen=(QUELLE_LGL, QUELLE_OSM), titel="Stadtschatten"):
@@ -28,9 +29,13 @@ def info_box(m, parameter, quellen=(QUELLE_LGL, QUELLE_OSM), titel="Stadtschatte
     m         : folium.Map
     parameter : dict {Bezeichnung: Wert} - die Werte, mit denen der Lauf lief
     quellen   : Liste von Quellenangaben
+
+    Die Namensnennung (AUTOR) wird IMMER angehaengt, unabhaengig davon, was
+    fuer `quellen` uebergeben wird - so kann sie nicht versehentlich
+    wegfallen, wenn ein Aufruf eine eigene, kuerzere quellen-Liste nutzt.
     """
     zeilen = "".join(f"<div><b>{k}:</b> {v}</div>" for k, v in parameter.items())
-    quellen_html = "".join(f"<div>{q}</div>" for q in quellen)
+    quellen_html = "".join(f"<div>{q}</div>" for q in (*quellen, AUTOR))
     html = f"""
     <div style="position: fixed; bottom: 20px; left: 20px; z-index: 9999;
                 background: rgba(255,255,255,0.92); padding: 10px 12px;

@@ -386,8 +386,6 @@ def exportiere_vorlage(orte_bewertet, ranglisten, pfad=None, top_je_kategorie=3,
     zeitfenster = f"{DATUM}, {AGG_START_STUNDE:02d}-{AGG_END_STUNDE:02d} Uhr (Tagesmittel)"
     ax_titel.text(0, 0.8, "Stadtschatten - Verschattungsbedarf: Top-Orte je Aufenthaltsart",
                  fontsize=15, fontweight="bold", va="top")
-    ax_titel.text(0, 0.45, "(Nathalie Gassert)",
-                 fontsize=9, color="#444", va="top")
     ax_titel.text(0, 0.15,
                  f"{PLACE}  |  Zeitfenster: {zeitfenster}  |  Dringlichkeit = Sonnendosis "
                  f"x Gewicht je Aufenthaltsart (fachliche Gewichtung, siehe Anlage)  |  "
@@ -401,6 +399,7 @@ def exportiere_vorlage(orte_bewertet, ranglisten, pfad=None, top_je_kategorie=3,
     _tabelle(ax_tab, top_flach)
 
     attribution_teile = [
+        "Nathalie Gassert - Stadtschatten - github.com/nath-ga/stadtschatten",
         "Datenquelle Verschattung: LGL, www.lgl-bw.de",
         "Aufenthaltsorte: (c) OpenStreetMap-Mitwirkende",
     ]
