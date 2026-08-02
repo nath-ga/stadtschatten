@@ -51,6 +51,15 @@ h1{font-size:clamp(34px,6vw,54px);line-height:1.02;margin:0 0 4px;font-weight:80
 .hinweise dl{margin:0;display:grid;gap:14px}
 .hinweise dt{font-weight:700;font-size:14.5px}
 .hinweise dd{margin:2px 0 0;color:var(--muted);font-size:14px;max-width:64ch}
+.grenzen{background:#efece4;border:1px solid var(--line);border-radius:10px;
+  padding:26px 26px 8px;margin-bottom:40px}
+.grenzen h3{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--deep);
+  margin:0 0 8px;font-weight:700}
+.grenzen .intro{font-size:14px;color:#3c4854;margin:0 0 18px;max-width:64ch}
+.grenzen dl{margin:0;display:grid;gap:16px}
+.grenzen dt{font-weight:700;font-size:14.5px}
+.grenzen dd{margin:3px 0 0;color:#4a5765;font-size:14px;line-height:1.5;max-width:64ch}
+.grenzen dd:last-of-type{margin-bottom:18px}
 footer{border-top:1px solid var(--line);padding-top:22px;color:var(--muted);font-size:12.5px;
   line-height:1.7}
 </style></head>
@@ -72,7 +81,6 @@ footer{border-top:1px solid var(--line);padding-top:22px;color:var(--muted);font
   <a class="karte" href="sonnendosis.html"><p class="kat">Grundlage</p><h2>Verschattung der Flächen</h2><p>Wie sonnig ist jede Fläche im Tagesmittel? Dächer sind herausgerechnet – bewertet wird der offene Boden, auf dem man sich aufhält.</p><span class="oeffnen">Karte öffnen</span></a>
 <a class="karte" href="nutzung_sonnendosis.html"><p class="kat">Einordnung</p><h2>Verschattung nach Nutzung</h2><p>Dieselbe Verschattung, verknüpft mit der amtlichen Nutzung der Grundstücke: welche Nutzungsart – Wohnen, Grünanlage, Gewerbe – wie stark besonnt ist. Je Nutzung einzeln einblendbar.</p><span class="oeffnen">Karte öffnen</span></a>
 <a class="karte" href="aufenthalt_bedarf.html"><p class="kat">Empfehlung</p><h2>Verschattungsbedarf an Aufenthaltsorten</h2><p>Schulen, Spielplätze, Kitas, soziale Einrichtungen, Bushaltestellen und Bänke, bewertet nach Sonne: rot heißt sonniger Aufenthaltsort – hier bringt Schatten am meisten.</p><span class="oeffnen">Karte öffnen</span></a>
-<a class="karte" href="route.html"><p class="kat">Beispiel</p><h2>Schattigster vs. schnellster Weg</h2><p>Ein Einzelbeispiel zwischen zwei festen Punkten: wie stark weicht der schattigste Weg vom schnellsten ab, und welcher Umweg wird dafür in Kauf genommen? Keine flächendeckende Auswertung wie die drei Karten oben, sondern eine Demonstration des Abwägungs-Prinzips für eine Route.</p><span class="oeffnen">Karte öffnen</span></a>
 
   </div>
 
@@ -81,9 +89,17 @@ footer{border-top:1px solid var(--line);padding-top:22px;color:var(--muted);font
     <dl><dt>Screening, kein Entscheidungswerkzeug</dt><dd>Die Karten zeigen, wo genaueres Hinschauen lohnt – nicht den fertigen Maßnahmenplan.</dd><dt>Momentaufnahme</dt><dd>Berechnet für den genannten Tag und das Stundenfenster; ein anderer Tag ergibt andere Schatten.</dd><dt>Einzelwerte mit Vorsicht</dt><dd>Belastbar ist der Vergleich zwischen Nutzungsklassen; der Wert eines einzelnen kleinen Grundstücks schwankt stärker.</dd><dt>Was die Daten nicht kennen, fehlt</dt><dd>Wartehäuschen an Haltestellen und in OpenStreetMap nicht erfasste Orte sind nicht berücksichtigt.</dd></dl>
   </div>
 
+  <div class="grenzen">
+    <h3>Was diese Karten können – und was nicht</h3>
+    <p class="intro">Diese Auswertung ist ein Werkzeug zur ersten Orientierung. Damit sie
+    fair eingesetzt werden kann, hier offen die wichtigsten Grenzen – sie sind bewusst
+    genannt, nicht versteckt.</p>
+    <dl><dt>Der Schatten wird eher unterschätzt als überschätzt</dt><dd>Für die Wege rechnet die Auswertung mit der Straßenmitte, nicht mit dem Gehweg am Rand. Wer am Gebäuderand läuft, geht aber oft im Schatten, während die Straßenmitte noch in der Sonne liegt. Die tatsächliche Beschattung für Fußgängerinnen und Fußgänger ist daher meist besser als hier dargestellt – nicht schlechter. Eine genauere Betrachtung der Gehwegseiten ist der nächste geplante Entwicklungsschritt.</dd><dt>Sonne ist nicht gleich Hitze</dt><dd>Die Auswertung kennt nur den Sonnenstand, nicht die Lufttemperatur. Ein sonniger Ort ist ein Hinweis auf mögliche Hitzebelastung, aber kein gemessener Temperaturwert.</dd><dt>Bäume werfen mehr Schatten als in Wirklichkeit</dt><dd>Baumkronen werden als geschlossene Blöcke gerechnet. Echte Kronen lassen Licht durch. Der Baumschatten ist deshalb eine Obergrenze – die Wirklichkeit ist etwas sonniger.</dd><dt>Vollständig nur, soweit die Grundlagendaten es sind</dt><dd>Die Aufenthaltsorte stammen aus OpenStreetMap, einer offenen Kartendatenbank. Ist ein Ort dort nicht oder falsch eingetragen, fehlt er auch hier. Die Auswertung ist so vollständig wie diese Datenbasis – nicht vollständiger.</dd><dt>Ein Flächenwert ist ein Durchschnitt</dt><dd>Der Sonnenwert eines Grundstücks oder Aufenthaltsorts ist über die ganze Fläche gemittelt. Innerhalb der Fläche kann es schattige und sonnige Ecken geben.</dd></dl>
+  </div>
+
   <footer>
     Datenquelle Verschattung: LGL, www.lgl-bw.de (LoD2, nDOM1, ALKIS)<br>
     Aufenthaltsorte: © OpenStreetMap-Mitwirkende<br>
-    © Nathalie Gassert · Stadtschatten
+    © <a href="mailto:ngassert@web.de" style="color:var(--deep);text-decoration:none;">Nathalie Gassert</a> · Stadtschatten
   </footer>
 </div></body></html>
